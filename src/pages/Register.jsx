@@ -1,5 +1,5 @@
+import PatientForm from "../components/PatientForm";
+
 export default function Register() {
-    return (
-        <div>Register</div>
-    )
+    return <PatientForm></PatientForm>
 }
