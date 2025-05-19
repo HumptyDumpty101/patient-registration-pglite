@@ -1,5 +1,4 @@
+import QueryConsole from "../components/QeryConsole";
 export default function Console() {
-    return (
-        <div>Console</div>
-    )
+  return <QueryConsole />;
 }
