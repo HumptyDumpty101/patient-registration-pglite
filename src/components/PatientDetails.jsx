@@ -7,6 +7,8 @@ export default function PatientDetails({ patient, onClose }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({...patient});
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [success, setSuccess] = useState(null);
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -20,6 +22,15 @@ export default function PatientDetails({ patient, onClose }) {
       ...prev,
       [name]: value
     }));
+    
+    // Clear error for this field when user types
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = {...prev};
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleEdit = () => {
@@ -30,9 +41,46 @@ export default function PatientDetails({ patient, onClose }) {
     setIsEditing(false);
     setFormData({...patient});
     setIsDeleting(false);
+    setErrors({});
+  };
+  
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Basic validation for required fields
+    if (!formData.first_name?.trim()) {
+      newErrors.first_name = 'First name is required';
+    }
+    
+    if (!formData.last_name?.trim()) {
+      newErrors.last_name = 'Last name is required';
+    }
+    
+    if (!formData.date_of_birth) {
+      newErrors.date_of_birth = 'Date of birth is required';
+    }
+    
+    if (!formData.gender) {
+      newErrors.gender = 'Gender is required';
+    }
+    
+    // Email validation
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Invalid email format';
+    }
+    
+    // Phone number validation
+    if (formData.contact_number && !/^\+?[\d\s-]{8,15}$/.test(formData.contact_number)) {
+      newErrors.contact_number = 'Invalid contact number format';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
+    if (!validateForm()) return;
+    
     setLoading(true);
     try {
       await pglite.query(`
@@ -59,9 +107,14 @@ export default function PatientDetails({ patient, onClose }) {
         patient.id
       ]);
       
-      setIsEditing(false);
+      setSuccess('Patient updated successfully');
+      setTimeout(() => {
+        setIsEditing(false);
+        setSuccess(null);
+      }, 1500);
     } catch (error) {
       console.error('Error updating patient:', error);
+      setErrors({ general: 'Failed to update patient. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -76,18 +129,44 @@ export default function PatientDetails({ patient, onClose }) {
     setLoading(true);
     try {
       await pglite.query('DELETE FROM patients WHERE id = $1', [patient.id]);
-      onClose();
+      setSuccess('Patient deleted successfully');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
     } catch (error) {
       console.error('Error deleting patient:', error);
+      setErrors({ general: 'Failed to delete patient. Please try again.' });
+      setIsDeleting(false);
     } finally {
       setLoading(false);
-      setIsDeleting(false);
     }
   };
 
+  const genderOptions = [
+    { value: 'Male', label: 'Male' },
+    { value: 'Female', label: 'Female' },
+    { value: 'Other', label: 'Other' },
+    { value: 'Prefer not to say', label: 'Prefer not to say' }
+  ];
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4 text-green-600">
+            <svg className="h-16 w-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold mb-2">{success}</h2>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-screen overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">
@@ -96,12 +175,20 @@ export default function PatientDetails({ patient, onClose }) {
             <button 
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
+              type="button"
+              aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
+          
+          {errors.general && (
+            <div className="mb-4 p-3 bg-red-50 rounded-md border border-red-200 text-red-600 text-sm">
+              {errors.general}
+            </div>
+          )}
           
           <div className="space-y-4">
             {isEditing ? (
@@ -116,8 +203,13 @@ export default function PatientDetails({ patient, onClose }) {
                       name="first_name"
                       value={formData.first_name}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.first_name ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {errors.first_name && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.first_name}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -129,8 +221,13 @@ export default function PatientDetails({ patient, onClose }) {
                       name="last_name"
                       value={formData.last_name}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.last_name ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {errors.last_name && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.last_name}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -142,8 +239,14 @@ export default function PatientDetails({ patient, onClose }) {
                       name="date_of_birth"
                       value={formData.date_of_birth}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      max={new Date().toISOString().split('T')[0]}
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.date_of_birth ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {errors.date_of_birth && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.date_of_birth}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -154,13 +257,19 @@ export default function PatientDetails({ patient, onClose }) {
                       name="gender"
                       value={formData.gender}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.gender ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                      <option value="Prefer not to say">Prefer not to say</option>
+                      {genderOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
+                    {errors.gender && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.gender}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -172,8 +281,14 @@ export default function PatientDetails({ patient, onClose }) {
                       name="contact_number"
                       value={formData.contact_number || ''}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="e.g., +91 9876543210"
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.contact_number ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {errors.contact_number && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.contact_number}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -185,8 +300,14 @@ export default function PatientDetails({ patient, onClose }) {
                       name="email"
                       value={formData.email || ''}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="e.g., patient@example.com"
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        errors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {errors.email && (
+                      <p className="mt-1 text-red-500 text-sm">{errors.email}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -199,6 +320,7 @@ export default function PatientDetails({ patient, onClose }) {
                     value={formData.address || ''}
                     onChange={handleChange}
                     rows="2"
+                    placeholder="Patient's residential address"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   ></textarea>
                 </div>
@@ -212,52 +334,72 @@ export default function PatientDetails({ patient, onClose }) {
                     value={formData.medical_history || ''}
                     onChange={handleChange}
                     rows="3"
+                    placeholder="Relevant medical history, allergies, or ongoing treatments"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   ></textarea>
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Full Name</h3>
-                    <p className="mt-1">{patient.first_name} {patient.last_name}</p>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Personal Information</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-gray-500">Full Name</p>
+                        <p className="font-medium">{patient.first_name} {patient.last_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Date of Birth</p>
+                        <p className="font-medium">{formatDate(patient.date_of_birth)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Gender</p>
+                        <p className="font-medium">{patient.gender}</p>
+                      </div>
+                    </div>
                   </div>
                   
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Date of Birth</h3>
-                    <p className="mt-1">{formatDate(patient.date_of_birth)}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Gender</h3>
-                    <p className="mt-1">{patient.gender}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Contact Number</h3>
-                    <p className="mt-1">{patient.contact_number || '—'}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Email</h3>
-                    <p className="mt-1">{patient.email || '—'}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Registration Date</h3>
-                    <p className="mt-1">{formatDate(patient.created_at)}</p>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Information</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-gray-500">Phone Number</p>
+                        <p className="font-medium">{patient.contact_number || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Email Address</p>
+                        <p className="font-medium">{patient.email || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Address</p>
+                        <p className="font-medium whitespace-pre-line">{patient.address || '—'}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Address</h3>
-                  <p className="mt-1 whitespace-pre-line">{patient.address || '—'}</p>
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Medical History</h3>
+                  <p className="whitespace-pre-line">{patient.medical_history || 'No medical history recorded.'}</p>
                 </div>
                 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Medical History</h3>
-                  <p className="mt-1 whitespace-pre-line">{patient.medical_history || '—'}</p>
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Registration Information</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500">Patient ID</p>
+                      <p className="font-medium">{patient.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Registered On</p>
+                      <p className="font-medium">{formatDate(patient.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Last Updated</p>
+                      <p className="font-medium">{formatDate(patient.updated_at)}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -269,30 +411,42 @@ export default function PatientDetails({ patient, onClose }) {
             <>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                 disabled={loading}
+                type="button"
               >
                 Cancel
               </button>
               
               <button
                 onClick={handleSave}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                className={`cursor-pointer px-4 py-2 text-sm font-medium text-white rounded-md ${
                   loading 
-                    ? 'bg-blue-400 cursor-not-allowed' 
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-lime-400 cursor-not-allowed' 
+                    : 'bg-lime-600 hover:bg-lime-700'
                 }`}
                 disabled={loading}
+                type="button"
               >
-                {loading ? 'Saving...' : 'Save Changes'}
+                {loading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </span>
+                ) : (
+                  'Save Changes'
+                )}
               </button>
             </>
           ) : (
             <>
-              <div>
+              <div className="flex space-x-2">
                 <button
                   onClick={handleDelete}
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                  className={`cursor-pointer px-4 py-2 text-sm font-medium text-white rounded-md ${
                     loading 
                       ? 'bg-red-400 cursor-not-allowed' 
                       : isDeleting
@@ -300,9 +454,10 @@ export default function PatientDetails({ patient, onClose }) {
                         : 'bg-red-500 hover:bg-red-600'
                   }`}
                   disabled={loading}
+                  type="button"
                 >
                   {loading 
-                    ? 'Deleting...' 
+                    ? 'Processing...' 
                     : isDeleting
                       ? 'Confirm Delete'
                       : 'Delete'
@@ -311,8 +466,9 @@ export default function PatientDetails({ patient, onClose }) {
                 {isDeleting && (
                   <button
                     onClick={handleCancel}
-                    className="ml-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                     disabled={loading}
+                    type="button"
                   >
                     Cancel
                   </button>
@@ -321,9 +477,10 @@ export default function PatientDetails({ patient, onClose }) {
               
               <button
                 onClick={handleEdit}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className="cursor-pointer px-4 py-2 text-sm font-medium text-white bg-lime-600 rounded-md hover:bg-lime-700"
+                type="button"
               >
-                Edit
+                Edit Patient
               </button>
             </>
           )}

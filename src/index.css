@@ -23,6 +23,10 @@ a:hover {
   @apply text-lime-800;
 }
 
+button {
+  @apply cursor-pointer;
+}
+
 body {
   margin: 0;
   display: flex;
