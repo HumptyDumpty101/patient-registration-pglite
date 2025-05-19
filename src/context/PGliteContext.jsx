@@ -33,13 +33,25 @@ export function PGliteProvider({ children }) {
             last_name TEXT NOT NULL,
             date_of_birth DATE NOT NULL,
             gender TEXT NOT NULL,
-            contact_number TEXT,
-            email TEXT,
+            contact_number TEXT UNIQUE,
+            email TEXT UNIQUE,
             address TEXT,
             medical_history TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
+        `);
+
+        // Create unique indexes for email and contact number
+        // These will allow for NULL values while ensuring uniqueness for non-NULL values
+        await db.exec(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_email ON patients (email) 
+          WHERE email IS NOT NULL;
+        `);
+
+        await db.exec(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_contact_number ON patients (contact_number) 
+          WHERE contact_number IS NOT NULL;
         `);
 
         // Set initial leader status for multitab setup
@@ -63,9 +75,23 @@ export function PGliteProvider({ children }) {
 
     // Cleanup function
     return () => {
-     
+      // Nothing to clean up for now
     };
   }, []);
+
+  // Helper function to check if a patient already exists
+  const checkPatientExists = async (field, value) => {
+    if (!value || !pglite) return false;
+    
+    try {
+      const query = `SELECT COUNT(*) as count FROM patients WHERE ${field} = $1`;
+      const result = await pglite.query(query, [value]);
+      return result.rows[0].count > 0;
+    } catch (err) {
+      console.error(`Error checking existing ${field}:`, err);
+      throw err;
+    }
+  };
 
   // Context value
   const value = {
@@ -79,8 +105,22 @@ export function PGliteProvider({ children }) {
         return await pglite.query(query, params);
       } catch (err) {
         console.error('Error executing query:', err);
+        // Check if it's a uniqueness constraint violation
+        if (err.message.includes('UNIQUE constraint failed')) {
+          if (err.message.includes('idx_patients_email')) {
+            throw new Error('A patient with this email already exists');
+          } else if (err.message.includes('idx_patients_contact_number')) {
+            throw new Error('A patient with this contact number already exists');
+          }
+        }
         throw err;
       }
+    },
+    checkEmailExists: async (email) => {
+      return checkPatientExists('email', email);
+    },
+    checkContactExists: async (contactNumber) => {
+      return checkPatientExists('contact_number', contactNumber);
     }
   };
 
