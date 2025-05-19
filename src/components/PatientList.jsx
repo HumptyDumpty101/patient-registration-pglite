@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from '../hooks/useLiveQuery';
 import { usePGlite } from '../context/PGliteContext';
@@ -12,25 +12,39 @@ export default function PatientList() {
     key: 'created_at',
     direction: 'desc'
   });
+  const [filteredPatients, setFilteredPatients] = useState([]);
 
-  // Use live query to get patients with optional search filter and sorting
-  let query = searchTerm 
-    ? `SELECT * FROM patients 
-       WHERE first_name ILIKE $1 
-       OR last_name ILIKE $1 
-       OR email ILIKE $1`
-    : 'SELECT * FROM patients';
-    
-  // Add sorting
-  query += ` ORDER BY ${sortConfig.key} ${sortConfig.direction === 'asc' ? 'ASC' : 'DESC'}`;
-
-  const params = searchTerm ? [`%${searchTerm}%`] : [];
-  
+  // Get all patients without filtering in the SQL query
   const { 
     data: patients, 
     loading: patientsLoading,
     error: patientsError,
-  } = useLiveQuery(query, params);
+  } = useLiveQuery(`SELECT * FROM patients ORDER BY ${sortConfig.key} ${sortConfig.direction === 'asc' ? 'ASC' : 'DESC'}`);
+
+  // Filter patients in JavaScript instead of SQL
+  useEffect(() => {
+    if (!patients) {
+      setFilteredPatients([]);
+      return;
+    }
+
+    if (!searchTerm) {
+      setFilteredPatients(patients);
+      return;
+    }
+
+    const searchTermLower = searchTerm.toLowerCase();
+    const filtered = patients.filter(patient => {
+      return (
+        patient.first_name.toLowerCase().includes(searchTermLower) ||
+        patient.last_name.toLowerCase().includes(searchTermLower) ||
+        (patient.email && patient.email.toLowerCase().includes(searchTermLower)) ||
+        (patient.contact_number && patient.contact_number.includes(searchTerm))
+      );
+    });
+    
+    setFilteredPatients(filtered);
+  }, [patients, searchTerm]);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -92,7 +106,7 @@ export default function PatientList() {
                 <span className="bg-lime-100 text-black text-xs px-2 py-1 rounded">Follower Tab</span>
               }
               <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                {patients.length} {patients.length === 1 ? 'patient' : 'patients'}
+                {filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'}
               </span>
             </div>
             
@@ -149,7 +163,7 @@ export default function PatientList() {
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-lime-500 border-t-transparent"></div>
           <p className="mt-2 text-gray-500">Loading patients...</p>
         </div>
-      ) : patients.length === 0 ? (
+      ) : !filteredPatients || filteredPatients.length === 0 ? (
         <div className="p-8 text-center">
           <svg className="h-16 w-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -215,7 +229,7 @@ export default function PatientList() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {patients.map((patient) => (
+              {filteredPatients.map((patient) => (
                 <tr 
                   key={patient.id} 
                   onClick={() => handlePatientClick(patient)}

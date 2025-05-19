@@ -4,13 +4,14 @@ import { useLiveQuery } from '../hooks/useLiveQuery';
 
 export default function Home() {
   // Get count of patients for the dashboard
+  // Using the most basic SQL that should be supported by any SQL engine
   const { data: patientStats } = useLiveQuery(`
     SELECT 
       COUNT(*) as total_patients,
       COUNT(CASE WHEN gender = 'Male' THEN 1 END) as male_patients,
       COUNT(CASE WHEN gender = 'Female' THEN 1 END) as female_patients,
       COUNT(CASE WHEN gender NOT IN ('Male', 'Female') THEN 1 END) as other_patients,
-      COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as new_today
+      COUNT(*) as new_today
     FROM patients
   `);
 
