@@ -8,5 +8,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
     exclude: ['@electric-sql/pglite'],
-  }
+  },
+  worker: {
+    format: 'es',
+  },
 })
