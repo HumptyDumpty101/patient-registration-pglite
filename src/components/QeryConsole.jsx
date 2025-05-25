@@ -11,6 +11,7 @@ export default function QueryConsole() {
   const [showHelp, setShowHelp] = useState(false);
   const [queryHistory, setQueryHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Load query history from localStorage
   useEffect(() => {
@@ -102,11 +103,16 @@ export default function QueryConsole() {
     setShowHelp(!showHelp);
   };
 
+  const toggleHistory = () => {
+    setShowHistory(!showHistory);
+  };
+
   const selectHistoryItem = (index) => {
     const item = queryHistory[index];
     setQuery(item.query);
     setQueryParams(item.params || "");
     setHistoryIndex(index);
+    setShowHistory(false); // Close history on mobile after selection
   };
 
   const renderResultTable = () => {
@@ -131,9 +137,11 @@ export default function QueryConsole() {
               {columns.map((column) => (
                 <th
                   key={column}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
-                  {column}
+                  <div className="truncate max-w-[100px] sm:max-w-none" title={column}>
+                    {column}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -144,9 +152,11 @@ export default function QueryConsole() {
                 {columns.map((column) => (
                   <td
                     key={`${rowIndex}-${column}`}
-                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                    className="px-3 sm:px-6 py-4 text-sm text-gray-500"
                   >
-                    {renderCellValue(row[column])}
+                    <div className="max-w-[150px] sm:max-w-[200px] truncate" title={renderCellValue(row[column])}>
+                      {renderCellValue(row[column])}
+                    </div>
                   </td>
                 ))}
               </tr>
@@ -177,7 +187,7 @@ export default function QueryConsole() {
     { name: "All Patients", query: "SELECT * FROM patients" },
     { name: "Patient Count", query: "SELECT COUNT(*) FROM patients" },
     {
-      name: "Patient by Gender",
+      name: "By Gender",
       query: "SELECT gender, COUNT(*) FROM patients GROUP BY gender",
     },
     {
@@ -205,17 +215,25 @@ export default function QueryConsole() {
   };
 
   return (
-    <div className="bg-white shadow-md rounded-lg overflow-hidden">
+    <div className="bg-white shadow-md rounded-lg overflow-hidden max-w-full">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
           <h2 className="text-xl font-semibold">SQL Query Console</h2>
           <div className="flex items-center space-x-2">
             <button
               onClick={toggleHelp}
-              className="text-lime-600 hover:text-lime-800 text-sm cursor-pointer"
+              className="text-lime-600 hover:text-lime-800 text-sm cursor-pointer px-3 py-1 border border-lime-200 rounded"
             >
               {showHelp ? "Hide Help" : "Show Help"}
             </button>
+            {queryHistory.length > 0 && (
+              <button
+                onClick={toggleHistory}
+                className="sm:hidden text-lime-600 hover:text-lime-800 text-sm cursor-pointer px-3 py-1 border border-lime-200 rounded"
+              >
+                {showHistory ? "Hide History" : "History"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -234,19 +252,19 @@ export default function QueryConsole() {
               </li>
               <li>
                 Press{" "}
-                <kbd className="bg-gray-200 px-1 py-0.5 rounded">
+                <kbd className="bg-gray-200 px-1 py-0.5 rounded text-xs">
                   Ctrl+Enter
                 </kbd>{" "}
                 or{" "}
-                <kbd className="bg-gray-200 px-1 py-0.5 rounded">⌘+Enter</kbd>{" "}
+                <kbd className="bg-gray-200 px-1 py-0.5 rounded text-xs">⌘+Enter</kbd>{" "}
                 to execute the query
               </li>
               <li>
                 Example:{" "}
-                <code className="bg-lime-100 px-1">
+                <code className="bg-lime-100 px-1 text-xs">
                   SELECT * FROM patients WHERE id = $1
                 </code>{" "}
-                with parameter <code className="bg-lime-100 px-1">1</code>
+                with parameter <code className="bg-lime-100 px-1 text-xs">1</code>
               </li>
               <li>Your query history is saved for future use</li>
             </ul>
@@ -254,7 +272,7 @@ export default function QueryConsole() {
         )}
 
         <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-1">
+          <div className="text-sm font-medium text-gray-700 mb-2">
             Sample Queries:
           </div>
           <div className="flex flex-wrap gap-2">
@@ -270,8 +288,9 @@ export default function QueryConsole() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-3 space-y-3">
+        <div className="space-y-4">
+          {/* Query Input Section */}
+          <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 SQL Query
@@ -291,7 +310,10 @@ export default function QueryConsole() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Query Parameters (comma-separated or JSON array)
+                Query Parameters
+                <span className="text-gray-500 text-xs ml-2">
+                  (comma-separated or JSON array)
+                </span>
               </label>
               <input
                 type="text"
@@ -302,18 +324,18 @@ export default function QueryConsole() {
               />
             </div>
 
-            <div>
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={executeQuery}
                 disabled={loading || !query.trim()}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-white rounded-md ${
                   loading || !query.trim()
                     ? "bg-lime-400 cursor-not-allowed"
                     : "bg-lime-600 hover:bg-lime-700"
                 }`}
               >
                 {loading ? (
-                  <span className="flex items-center">
+                  <span className="flex items-center justify-center">
                     <svg
                       className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
                       xmlns="http://www.w3.org/2000/svg"
@@ -343,23 +365,51 @@ export default function QueryConsole() {
             </div>
           </div>
 
+          {/* Query History - Desktop Sidebar */}
           {queryHistory.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="hidden sm:block">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Recent Queries
               </label>
-              <div className="border border-gray-300 rounded-md max-h-[192px] overflow-y-auto">
+              <div className="border border-gray-300 rounded-md max-h-[200px] overflow-y-auto">
                 {queryHistory.map((item, index) => (
                   <div
                     key={index}
                     onClick={() => selectHistoryItem(index)}
-                    className={`p-2 text-xs cursor-pointer hover:bg-gray-50 border-b border-gray-200 last:border-b-0 truncate ${
+                    className={`p-3 text-xs cursor-pointer hover:bg-gray-50 border-b border-gray-200 last:border-b-0 ${
                       index === historyIndex ? "bg-lime-50" : ""
                     }`}
                   >
-                    <div className="font-mono truncate">{item.query}</div>
+                    <div className="font-mono truncate mb-1">{item.query}</div>
                     {item.params && (
                       <div className="text-gray-500 truncate">
+                        Params: {item.params}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Query History - Mobile Dropdown */}
+          {queryHistory.length > 0 && showHistory && (
+            <div className="sm:hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Recent Queries
+              </label>
+              <div className="border border-gray-300 rounded-md max-h-[300px] overflow-y-auto">
+                {queryHistory.map((item, index) => (
+                  <div
+                    key={index}
+                    onClick={() => selectHistoryItem(index)}
+                    className={`p-3 text-xs cursor-pointer hover:bg-gray-50 border-b border-gray-200 last:border-b-0 ${
+                      index === historyIndex ? "bg-lime-50" : ""
+                    }`}
+                  >
+                    <div className="font-mono break-words mb-1">{item.query}</div>
+                    {item.params && (
+                      <div className="text-gray-500 break-words">
                         Params: {item.params}
                       </div>
                     )}
@@ -374,13 +424,13 @@ export default function QueryConsole() {
       {error ? (
         <div className="p-4 bg-red-50 text-red-600 border-t border-red-200">
           <h3 className="font-medium mb-1">Error:</h3>
-          <pre className="text-sm overflow-x-auto p-2 bg-red-100 rounded">
+          <pre className="text-sm overflow-x-auto p-2 bg-red-100 rounded whitespace-pre-wrap break-words">
             {error}
           </pre>
         </div>
       ) : (
         <div className="border-t border-gray-200">
-          <div className="p-4 bg-gray-50 text-gray-700 text-sm font-medium flex justify-between items-center">
+          <div className="p-4 bg-gray-50 text-gray-700 text-sm font-medium flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <span>
               Query Results{" "}
               {results?.rowCount !== undefined && `(${results.rowCount} rows)`}
@@ -400,9 +450,9 @@ export default function QueryConsole() {
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="text-lime-600 hover:text-lime-800 text-xs"
+                className="text-lime-600 hover:text-lime-800 text-xs border border-lime-200 px-2 py-1 rounded"
               >
-                Export as CSV
+                Export CSV
               </button>
             )}
           </div>
